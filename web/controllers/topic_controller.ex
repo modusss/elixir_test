@@ -7,6 +7,12 @@ defmodule Discuss.TopicController do
   # params -> parameters
 
   alias Discuss.Topic
+  # 'you should be logged in to go to these pages'
+  # this plug is going to be executed before any handler inside of this file
+  plug Discuss.Plugs.RequireAuth when action in [:new, :create, :edit, :delete]
+  # 'you should be the owner of the topic to get acess to these pages'
+  # this 'plug function' was made inside this controller because we just want this to be used here
+  plug :check_topic_owner when action in [:update, :edit, :delete]
 
   def index(conn, _params) do
     # because we inherited with 'alias', we don't need to put:
@@ -14,6 +20,11 @@ defmodule Discuss.TopicController do
     topics = Repo.all(Topic)
     # render this template and make 'topics' available with the variable 'topics'
     render conn, "index.html", topics: topics
+  end
+
+  def show(conn, %{"id" => topic_id}) do
+    topic = Repo.get!(Topic, topic_id)
+    render conn, "show.html", topic: topic
   end
 
   # we put '_' with params because we are not caring about this data at now
@@ -38,7 +49,10 @@ defmodule Discuss.TopicController do
     # changeset -> represents the changes we want on the database
     # topic -> a title from whatever came from the form
     # %Topic{} -> an empty struct because we are creating something from scretch (if we were updating, we should pass parameters)
-    changeset = Topic.changeset(%Topic{}, topic)
+    changeset = conn.assigns.user
+    # build_assoc makes a 'topic' struc with the database association between the user and the topic
+    |> build_assoc(:topics)
+    |> Topic.changeset(topic)
     # bellow we actually insert in the database
     # this function we got from the calling :controller
     case Repo.insert(changeset) do
@@ -87,4 +101,16 @@ defmodule Discuss.TopicController do
     |> redirect(to: topic_path(conn, :index))
   end
 
+  # the id of this specific topic belongs to the current user?
+  def check_topic_owner(conn,_params) do
+    %{params: %{"id" => topic_id}} = conn
+    if Repo.get(Topic, topic_id).user_id == conn.assigns.user.id do
+      conn
+    else
+      conn
+      |> put_flash(:error, "You cannot edit that.")
+      |> redirect(to: topic_path(conn, :index))
+      |> halt()
+    end
+  end
 end

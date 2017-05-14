@@ -4,6 +4,8 @@ defmodule Discuss.Topic do
 # we have to tell the model about how is the database we created to make possible phoenix to see it
   schema "topics" do
     field :title, :string
+    belongs_to :user, Discuss.User
+    has_many :comments, Discuss.Comment
   end
 # struct:
 # an hash that contains some data.
